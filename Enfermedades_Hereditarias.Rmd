@@ -1,0 +1,204 @@
+---
+title: "Modelos de Pérdida"
+author: "Alonso Nahir Ramírez"
+date: "2023-10-07"
+output:
+  html_document:
+    df_print: paged
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE}
+library(readxl)
+library(dplyr)
+library(fitdistrplus)
+library(MASS)
+```
+
+Nuestro objetivo es encontrar la relación estadística entre la presencia
+de enfermedades en progenitores y hermanos, con la presencia de las
+mismas en el sujeto de estudio. Para este acercamiento utilizamos una
+regresión logística.
+
+#Regresión Logística Supongamos a $y$ una variable aleatoria con
+distribución Bernoulli de tal forma que los posibles valores son 0 y 1.
+Entonces, la esperanza de $y$ es la probabilidad de que tome el valor
+unitario. Es decir, $E(y)=1\cdot P(y=1)+0\cdot P(y=0)=P(y=1)$
+posteriormente definido sólo como $p$. Se puede definir una relación
+funcional entre $p$ y variables aleatorias independientes $x$ de tal
+forma que la función sea asintóticamente 1 para $x\rightarrow\infty$ y 0
+cuando $x\rightarrow-\infty$. Un buen candidato a esta función es
+$$p_i=E(y)=\frac{e^{\beta_0+\sum_{k=0}^n\beta_kx_k}}{1+e^{\beta_0+\sum_{k=0}^n\beta_kx_k}}$$
+Este modelo puede ser lieanlizado por la transformación (llamada
+tranformación logit)
+$$\ln\left(\frac{p}{1-p} \right)=\beta_0+\sum_{k=0}^n\beta_kx_k \quad (1)$$
+Donde $i=\overline{1,m}$ es la i-ésima observación de una muestra de
+tamaño $m$ y $n$ es el número de variables regresoras. Note que el
+argumento del logaritmo neperiano es la razón de la probabilidad de
+ocurrencia de suceso contra la probabilidad de no ocurrencia. Para el
+caso bernoulli tenemos $\frac{p}{1-p}=\frac{P(y=1|X=x)}{1-P(y=1|X=x)}$.
+De $(1)$ podemos hacer una estimación por el método de Newton-Raphson.
+Una vez obtenidos los coeficientes estimados podemos exponenciar en
+ambos lados para dar una interpretación a los parámetros $\beta_k$ o
+hacer la transformación inversa para estimar la probabilidad $p$.
+$$\frac{p}{1-p}=e^{\hat\beta_0+\sum_{k=0}^n\hat\beta_kx_k} \quad y \quad \hat p=\frac{e^{\hat\beta_0+\sum_{k=0}^n\hat\beta_kx_k}}{1+e^{\hat\beta_0+\sum_{k=0}^n\hat\beta_kx_k}} \quad (2)$$
+Si las variables regresoras son igualmente Bernoulli, entonces podemos
+obtener estimaciones marginales para las anteriores dos expresiones
+suponiendo que $x_i=0 \; \forall i\neq j$ donde $x_j$ es la j-ésima
+variable que nos interesa, de tal modo que $x_j=1$. Entonces, para el
+caso marginal
+$$\frac{p}{1-p}=e^{\hat\beta_0+\hat\beta_j} \quad y \quad \hat p=\frac{e^{\hat\beta_0+\hat\beta_j}}{1+e^{\hat\beta_0+\hat\beta_j}}$$
+Si $\frac{p}{1-p}>1$ entonces la probabilidad de éxito aumenta en
+presencia de $x_j$, por el contrario, si $\frac{p}{1-p}<1$ la
+probabilidad disminuye. Note que para el caso unitario $\frac{p}{1-p}=1$
+la probabilidad no se ve afectada por la presencia o ausencia de la
+variable $x_j$. El valor $\hat p$ nos proporciona una probabilidad
+puntual estimada de éxito con la presencia de $x_j$ y no una variación
+de dicha probabilidad como en el caso anterior.
+El nivel de bondad de ajuste $R^2$ de Cox & Snell es útil para medir la variabilidad de los datos explicada por el modelo y se define de la forma
+$$R^2=1-\exp{\left(-\frac{2}{n}[\log(L_0)-\log(L_m)]\right)} \quad (3)$$
+Además, existen otras definiciones de $R^2$ tales como el radio de verosimilitudes, la R de Nagelkerke, R de McFadden, entre otros muchos. Si las variables regresoras también son categóricas no ordinales, estos estadísticos no tienen sentido en el contexto de ajuste. En este caso, el estadístico de Wald nos proporciona una prueba $t$ para la significancia de las variables individuales y se define como
+$$W_j=\frac{\beta_j^2}{V({\beta_j})}$$
+
+```{r}
+base<- read.csv("C:/Users/cacah/OneDrive/BUAP/2023 Otoño/modelos de pérdida/CS_ADULTOS 2.csv")
+
+```
+
+Filtramos los datos necesarios y cambios los "2"
+
+# Diabetes
+
+```{r}
+#Primero filtramos los datos
+datosD<- base %>%
+  filter(P7_1_1!=9 & P7_1_2!=9 & P7_1_3 !=9 & P3_1 !=2) 
+#Cambios 2 y 3 por 0
+datosD<- datosD %>%
+    mutate_all(~ ifelse(. == 2 | .==3, 0, .))
+  
+```
+
+Hacemos el modelo
+
+```{r}
+modeloD<- glm(P3_1~P7_1_1+P7_1_2+P7_1_3, data = datosD, family = binomial)
+summary(modeloD)
+```
+
+Haciendo las transformaciones referentes a $(2)$ :
+
+```{r}
+exp(coefficients(modeloD))
+(exp(coefficients(modeloD)))/(1+exp(coefficients(modeloD)))
+```
+
+De aquí podemos notar que la probabilidad de padecer diabetes aumenta un
+41.98% si tu padre la padece, un 53.56% si tu madre la padece y un 349%
+(no estoy seguro xd) si tu hermano la padece. Por otro lado, es
+estimación puntual, la probabilidad de tener diabetes si tu padre la
+tiene es de 58.67%, si tu madre la tiene es de 60.56% y si tu hermano la
+tiene es del 81.78%.
+```{r}
+modelo_nullD<-glm(P3_1~1, data = datosD, family = binomial)
+veroD<-logLik(modeloD)
+vero_nullD<-logLik(modelo_nullD)
+nD<-nrow(datosD)
+R2_D <- 1 - exp(-2/nD * (vero_nullD - veroD))
+print(R2_D)
+```
+Aquí vemos un $R^2=-0.063$, muy bajo considerando que el valor 0 es el mínimo. Sin embargo, como ya se mencionó, esto no es una medida de ajuste adecuado para la naturaleza dicotómica de las variables regresoras. Es por ello que nos fiamos del estadístico de Wald que reporta significancia para todas las variables.
+
+# Infarto
+
+```{r}
+datosI<- base %>%
+  filter(P7_4_1!=9 & P7_4_2!=9 & P7_3_3 !=9 )
+datosI<- datosI %>%
+  mutate_all(~ ifelse(.==2,0,.))
+```
+
+Hacemos el modelo
+
+```{r}
+modeloI<- glm(P5_1~P7_4_1+P7_4_2+P7_3_3, data = datosI, family = binomial)
+summary(modeloI)
+```
+```{r}
+exp(coefficients(modeloI))
+(exp(coefficients(modeloI)))/(1+exp(coefficients(modeloI)))
+```
+
+```{r}
+modelo_nullI<-glm(P5_1~1, data = datosI, family = binomial)
+veroI<-logLik(modeloI)
+vero_nullI<-logLik(modelo_nullI)
+nI<-nrow(datosI)
+R2_I <- 1 - exp(-(2/nI) * (vero_nullI - veroI))
+print(R2_I)
+```
+
+# Colesterol
+
+```{r}
+datosC<- base %>%
+  filter(P7_5_1!=9 & P7_5_2!=9 & P7_5_3 !=9 )
+datosC<- datosC %>%
+  mutate_all(~ifelse(.==2,0,.))
+```
+
+Creamos el modelo
+
+```{r}
+modeloC<- glm(P6_4~P7_5_1+P7_5_2+P7_5_3, data = datosC,  family = binomial)
+summary(modeloC)
+```
+
+```{r}
+exp(coefficients(modeloC))
+(exp(coefficients(modeloC)))/(1+exp(coefficients(modeloC)))
+```
+
+```{r}
+modelo_nullC<-glm(P5_1~1, data = datosC, family = binomial)
+veroC<-logLik(modeloC)
+vero_nullC<-logLik(modelo_nullC)
+nC<-nrow(datosC)
+R2_C <- 1 - exp(-(2/nC) * (vero_nullC - veroC))
+print(R2_C)
+```
+
+
+# Hipertension
+
+```{r}
+datosH<- base %>%
+  filter(P7_2_1!=9 & P7_2_2!=9 & P7_2_3 !=9 )
+datosH<- datosH %>%
+  mutate_all(~ifelse(.==2,0,.))
+```
+
+```{r}
+modeloH<- glm(P4_1~P7_2_1+P7_2_2+P7_2_3, data = datosH, family = binomial)
+summary(modeloH)
+```
+```{r}
+exp(coefficients(modeloH))
+(exp(coefficients(modeloH)))/(1+exp(coefficients(modeloH)))
+```
+
+```{r}
+modelo_nullH<-glm(P5_1~1, data = datosH, family = binomial)
+veroH<-logLik(modeloH)
+vero_nullH<-logLik(modelo_nullH)
+nH<-nrow(datosH)
+R2_H <- 1 - exp(-(2/nH) * (vero_nullH - veroH))
+print(R2_H)
+```
+
