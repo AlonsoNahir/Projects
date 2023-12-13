@@ -344,3 +344,6 @@ Ozono<-Matriz$Nivel.O3/100
 Monoxido_Carbono<-Matriz$Nivel.CO
 grupo2<-data.frame(Ozono,Monoxido_Carbono)
 boxplot(grupo2, col=rainbow(2), main="Variables ambientales")
+
+#Una vaca vestida de uniforme
+
